@@ -59,26 +59,33 @@
   },
   "code_tests": {
     "snapshot_date": "2026-11-03",
-    "passed": 567,
+    "passed": 600,
     "role": "original_local_environment_suite_not_archive_reproduction"
   },
   "market_constraints": {
-    "version": "tencent-market-qfq-v1.3-constraint-routing",
+    "version": "tencent-market-qfq-v1.4-query-understanding",
     "annual_extremes_supported": false,
     "bounded_correction_and_constraint_protection": true,
     "known_local_http": {
-      "passed": 10,
-      "denominator": 10,
-      "seconds": 2.1311590000987053
+      "passed": 16,
+      "denominator": 16,
+      "seconds": 2.054533899994567
     },
     "known_public_http": {
-      "passed": 10,
-      "denominator": 10,
-      "seconds": 3.8874373000580817
+      "passed": 6,
+      "denominator": 6,
+      "seconds": 2.8228430999442935
     },
     "model_calls": 0,
-    "original_report": "docs/retrospective/evidence/phase28-market-fix-final.json",
-    "original_report_sha256": "28ea00581a10760cab9a36886b53e182dbe563671000a0cef34ec447eec85f46"
+    "original_report": "docs/retrospective/evidence/phase31-query-validation.json",
+    "original_report_sha256": "1e4ad827ff8ac7b445041b82e9234d10939d36e8ff330af98bea99263787f14f"
+  },
+  "query_understanding": {
+    "version": "query-understanding-v1",
+    "role": "shared_normalization_context_and_capability_gate_not_general_NLU_accuracy",
+    "revenue_alias_basis": "营业收入",
+    "operating_revenue_total_is_separate": true,
+    "unknown_qualifiers_preserved": true
   },
   "corpus": {
     "companies": 20,

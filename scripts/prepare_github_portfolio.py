@@ -30,6 +30,7 @@ Demo 需要访问码，由本机通过 ngrok 提供服务，离线时无法访�
 - **财务与公告查询**：从审核过的字段目录读取数值，用 `Decimal` 计算同比、差额和单位换算。
 - **行情查询**：最新报价、PE、PB、市值、前复权日 K 线；支持手动回放保存的行情快照。
 - **Web 界面**：连续对话、历史会话、PDF 跳转、浅色与深色主题。
+- **查询理解**：财务与行情共用年份、别名和追问解析；未知条件保留并校验。
 
 当前数据覆盖 20 家公司、60 份年报及公告。财务和公告查询使用结构化目录，员工问答走 RAG，两条路径在
 [架构说明](docs/architecture.md) 中分别介绍。
@@ -67,7 +68,7 @@ python tools/check_source.py
 
 ## 测试与评测
 
-原开发环境最近一次运行 `pytest`：567 项通过（2026-11-03）。部分测试依赖未公开的数据文件。
+原开发环境最近一次运行 `pytest`：{test_count} 项通过（2026-11-03）。部分测试依赖未公开的数据文件。
 
 检索评测、业务回归及各自的数据范围见 [评测记录](docs/evaluation.md)。
 
@@ -80,7 +81,9 @@ python tools/check_source.py
 """
 ARCHITECTURE = """# 架构
 
-浏览器通过 FastAPI 提交问题。`DemoEngine` 根据问题类型选择文档问答、财务目录查询或行情查询。
+浏览器通过 FastAPI 提交问题。`qa/query_understanding.py`先规范化年份和别名、恢复相邻追问、
+检查能力范围，再由`DemoEngine`选择文档问答、财务目录查询或行情查询。原问题和未知条件保留。
+“总营收”按营业收入口径列示；营业总收入是另一个未核准指标。年度最高/最低行情仍不支持。
 
 ## 员工问答
 
@@ -219,7 +222,7 @@ Recall 是各题来源页召回率的平均值，26/30 是找齐所有来源页�
 
 ## 代码测试
 
-2026-11-03 在原开发环境运行完整 pytest：567 项通过。部分测试依赖本仓库没有附带的运行数据；
+2026-11-03 在原开发环境运行完整 pytest：{test_count} 项通过。部分测试依赖本仓库没有附带的运行数据；
 这不是公开仓库的 CI 结果。
 
 指标摘要及原始报告 SHA256 保存在 [`review/metrics.json`](../review/metrics.json)。
@@ -263,6 +266,7 @@ def main():
         raise SystemExit("Candidate exists; choose/review it rather than overwriting")
     target_dir.mkdir(parents=True)
     with zipfile.ZipFile(ROOT / "output/source/youju-source-review.zip") as archive:
+        test_count = json.loads(archive.read("review/metrics.json"))["code_tests"]["passed"]
         for name in archive.namelist():
             target = (target_dir / name).resolve()
             if not target.is_relative_to(target_dir):
@@ -271,11 +275,13 @@ def main():
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(archive.read(name))
-    (target_dir / "README.md").write_text(README, encoding="utf-8")
+    (target_dir / "README.md").write_text(
+        README.replace("{test_count}", str(test_count)), encoding="utf-8")
     (target_dir / "docs").mkdir()
     (target_dir / "docs/architecture.md").write_text(ARCHITECTURE, encoding="utf-8")
     (target_dir / "docs/reproduction.md").write_text(REPRODUCTION, encoding="utf-8")
-    (target_dir / "docs/evaluation.md").write_text(EVALUATION, encoding="utf-8")
+    (target_dir / "docs/evaluation.md").write_text(
+        EVALUATION.replace("{test_count}", str(test_count)), encoding="utf-8")
     shutil.copyfile(Path(__file__), target_dir / "scripts/prepare_github_portfolio.py")
     shutil.copyfile(ROOT / "output/pdf/youju-project.pdf", target_dir / "docs/project.pdf")
     (target_dir / "tools").mkdir()

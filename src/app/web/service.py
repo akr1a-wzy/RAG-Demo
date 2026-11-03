@@ -13,6 +13,8 @@ from app.qa.deepseek import DeepSeekClient
 from app.qa.diagnostics import FailureRecorder
 from app.qa.facts import VERSION, metric_in
 from app.qa.financial import FINANCIAL_VERSION, QA_POLICY, supported_financial_request
+from app.qa.query_understanding import VERSION as QUERY_VERSION
+from app.qa.query_understanding import capability_decision, understand_query
 from app.qa.resolution import resolve_document_query
 from app.qa.reviews import ReviewedFacts
 from app.qa.workflow import EMPLOYEE_QUERY_VERSION, DocumentQA
@@ -83,18 +85,26 @@ class DemoEngine:
     def metadata(self) -> dict:
         return {**self.runtime.metadata(), "qa_evidence_policy": QA_POLICY,
                 "binding_version": VERSION, "financial_fact_version": FINANCIAL_VERSION,
-                "market_version": MARKET_VERSION,
+                "market_version": MARKET_VERSION, "query_understanding_version": QUERY_VERSION,
                 "employee_query_policy": EMPLOYEE_QUERY_VERSION,
                 "document_catalog_version": CATALOG_VERSION}
 
     def ask(self, question: str, history: list[dict], *, evidence_only: bool = False,
             market_replay: bool = False) -> dict:
-        market_request = plan_market_request(question, history)
+        query = understand_query(question, history)
+        decision = capability_decision(query)
+        if decision is not None:
+            return {"mode": decision["status"], "message": decision["message"],
+                    "resolved": {**query.resolved, "query_understanding": {
+                        **query.metadata(), "capability": decision}},
+                    "generated_answer_accuracy_accepted": False}
+        market_request = plan_market_request(question, history, understanding=query)
         if market_request is not None:
             return self.market.ask(market_request, replay=market_replay)
         catalog = getattr(self, "catalog", None)
         if catalog is not None:
-            answer = catalog.ask(question, history, evidence_only=evidence_only)
+            answer = catalog.ask(question, history, evidence_only=evidence_only,
+                                 understanding=query)
             if answer is not None:
                 return answer
         allowed = generation_allowed(question, history,
@@ -123,4 +133,5 @@ class DemoEngine:
             "generation_allowed": allowed, "requested_evidence_only": evidence_only,
             "financial_amounts": "reviewed_revenue_only",
         }
+        answer.setdefault("resolved", {})["query_understanding"] = query.metadata()
         return answer

@@ -32,6 +32,45 @@ def test_original_pdf_proofs_and_complete_financial_matrix(catalog):
         assert not r["usage"] and r["answer_method"] == "structured_facts"
 
 
+@pytest.mark.parametrize("question", [
+    "总营收", "25年总营收", "宁德时代2025年总营收", "30075025年总营收",
+])
+def test_reported_revenue_aliases_use_verified_values_with_explicit_basis(catalog, question):
+    history = [{"role": "user", "content": "宁德时代2025年最高股价"},
+               {"role": "user", "content": "今日收盘价"}]
+    answer = catalog.ask(question, history)
+    control = catalog.ask("宁德时代2025年营业收入", [])
+    assert answer["mode"] == "structured_answer"
+    assert answer["claims"] == control["claims"] and answer["sources"] == control["sources"]
+    assert "营业收入口径" in answer["message"].replace("“", "").replace("”", "")
+    assert not answer["usage"]
+
+
+def test_revenue_followup_and_unit_change_keep_verified_values(catalog):
+    history = [{"role": "user", "content": "宁德时代25年总营收多少亿元"}]
+    response = catalog.ask("那24年换算万元呢", history)
+    control = catalog.ask("宁德时代2024年营业收入多少万元", [])
+    assert response["mode"] == "structured_answer"
+    assert response["claims"] == control["claims"]
+
+
+def test_demo_uses_shared_understanding_without_llm_or_market_provider(catalog):
+    from app.web.service import DemoEngine
+
+    class Forbidden:
+        def ask(self, *args, **kwargs):
+            pytest.fail("Revenue aliases must use verified catalog, not providers or generation")
+
+    engine = object.__new__(DemoEngine)
+    engine.catalog = catalog
+    engine.market = engine.qa = engine.evidence_qa = Forbidden()
+    history = [{"role": "user", "content": "宁德时代25年最高股价"}]
+    for question in ["总营收", "25年总营收", "宁德时代2025年总营收", "那24年的呢"]:
+        result = engine.ask(question, history)
+        assert result["mode"] == "structured_answer" and not result["usage"]
+        history.append({"role": "user", "content": question})
+
+
 def test_decimal_yoy_restated_and_scope(catalog):
     r = catalog.ask("中国神华2025年营收是多少，同比变化多少？", [])
     assert r["validation"]["calculations"][0]["result"] == "-13.21"

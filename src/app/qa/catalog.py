@@ -10,10 +10,16 @@ from pathlib import Path
 
 import pymupdf
 
-from app.qa.resolution import resolve_document_query
+from app.qa.query_understanding import (
+    DOCUMENT_ALIASES,
+    QueryUnderstanding,
+    capability_decision,
+    metric_matches,
+    understand_query,
+)
 from app.tools.ticker import ALIAS_TO_CODE, CODE_TO_CANONICAL_NAME
 
-VERSION = "reviewed-document-catalog-v2"
+VERSION = "reviewed-document-catalog-v3-query-understanding"
 LABELS = {
     "revenue": "营业收入",
     "net_profit_parent": "归母净利润",
@@ -30,24 +36,8 @@ LABELS = {
     "payment_date": "现金红利发放日",
     "meeting_date": "股东会日期",
 }
-ALIASES = {
-    "revenue": r"营业收入|营收",
-    "net_profit_parent_excl": r"扣非(?:归母)?净利润|扣除非经常性损益(?:后)?(?:的)?归母净利润"
-    r"|归属于(?:上市公司|母公司|本公司|本行)股东的扣除非经常性损益(?:后)?的净利润",
-    "net_profit_parent": r"归母(?:净利润|利润)"
-    r"|归属于(?:上市公司|母公司|本公司|本行)股东的净利润",
-    "operating_cashflow": r"经营(?:活动)?(?:产生的)?(?:现金流量净额|现金流净额|现金流)",
-    "total_assets": r"总资产|资产总额|资产总计",
-    "net_assets_parent": r"归母净资产"
-    r"|归属于(?:上市公司|母公司|本公司|本行)股东(?:的)?(?:净资产|权益)",
-    "basic_eps": r"基本每股收益|每股收益|EPS",
-    "roe": r"(?:加权平均)?净资产收益率|ROE",
-    "dividend_gross": r"每(?:10|十)?股(?:派息|分红|派现)|现金分红|现金股利|分红|派息|利润分配",
-    "record_date": r"股权登记日(?:期)?|登记日",
-    "ex_dividend_date": r"除权(?:除)?息日(?:期)?|除息日|除权日",
-    "payment_date": r"现金红利发放日(?:期)?|红利发放日|发放日|派发日|到账日",
-    "meeting_date": r"股东(?:大)?会(?:会议)?(?:召开)?(?:日(?:期)?|时间)|股东会什么时候(?:召开|开)",
-}
+
+ALIASES = DOCUMENT_ALIASES
 MONEY = {
     "元": Decimal(1),
     "千元": Decimal(1000),
@@ -184,34 +174,14 @@ MONEY_METRICS = set(LABELS) - {
 }
 
 
-def parse_request(question, history):
-    text = compact(question)
-    # 标准字段输入常把6位代码和4位年度相连；仅拆已登记代码+明确年度。
-    normalized = text
+def parse_request(question, history, *, understanding: QueryUnderstanding | None = None):
+    query = understanding or understand_query(question, history)
+    text = compact(query.effective)
     for code in CODE_TO_CANONICAL_NAME:
-        normalized = re.sub(rf"(?<!\d){code}(?=20\d{{2}}年)", code + " ", normalized)
-    resolved = resolve_document_query(normalized, history)
-    text = normalized
-    matches = []
-    for metric, pattern in ALIASES.items():
-        for match in re.finditer(pattern + "|" + re.escape(metric), text, re.I):
-            matches.append((match.start(), match.end(), metric))
-    matches = [
-        m
-        for m in matches
-        if not any(a <= m[0] and b >= m[1] and b - a > m[1] - m[0] for a, b, _ in matches)
-    ]
+        text = re.sub(rf"(?<!\d){code}(?=20\d{{2}}年)", code + " ", text)
+    resolved = {**query.resolved, "query_understanding": query.metadata()}
+    matches = metric_matches(text)
     metrics = list(dict.fromkeys(m[2] for m in sorted(matches)))
-    if (
-        not metrics
-        and re.search(r"那|呢|继续|再|它", text)
-        and history
-        and not re.search(r"员工|人员|人数|股价|行情|估值|日K|K线", text)
-    ):
-        previous = next((m["content"] for m in reversed(history) if m.get("role") == "user"), "")
-        prior = parse_request(previous, history[:-1]) if previous else None
-        if prior and prior["status"] == "supported":
-            metrics = prior["metrics"]
     overview = bool(re.search(r"财务概览|主要财务(?:数据|指标)|八项财务", text))
     if overview:
         metrics = sorted(MONEY_METRICS)
@@ -260,6 +230,9 @@ def parse_request(question, history):
         flags=re.I,
     )
     rest = re.sub(r"[\s\W_]", "", rest)
+    for condition in query.constraints:
+        if rest and rest in condition:
+            rest = condition
     distribution_scope = (
         "second_half" if "下半年" in text else "full_year" if "全年" in text else None
     )
@@ -276,6 +249,11 @@ def parse_request(question, history):
         )
     )
     blocked |= ann and unit not in {None, "元"}
+    decision = capability_decision(query)
+    blocked |= decision is not None
+    resolved["query_understanding"]["unrecognized_conditions"] = rest
+    if decision is not None:
+        resolved["query_understanding"]["capability"] = decision
     return {
         "resolved": resolved,
         "metrics": metrics,
@@ -331,8 +309,10 @@ class DocumentCatalog:
             for code in CODE_TO_CANONICAL_NAME
         }
 
-    def ask(self, question, history, *, evidence_only=False):
-        request = parse_request(question, history)
+    def ask(self, question, history, *, evidence_only=False,
+            understanding: QueryUnderstanding | None = None):
+        query = understanding or understand_query(question, history)
+        request = parse_request(question, history, understanding=query)
         if request is None:
             return None
         resolved = request["resolved"]
@@ -349,6 +329,9 @@ class DocumentCatalog:
         def stop(mode, message):
             return {**common, "mode": mode, "message": message}
 
+        decision = capability_decision(query)
+        if decision is not None:
+            return stop(decision["status"], decision["message"])
         if not codes:
             return stop("clarification", "请指定公司或股票代码；裸称平安需明确主体。")
         if not set(codes) <= CODE_TO_CANONICAL_NAME.keys():
@@ -358,7 +341,9 @@ class DocumentCatalog:
         if request["status"] != "supported":
             return stop(
                 "unsupported",
-                "该问题含未核准的指标或限定条件，请使用已核准字段及年度；可查看覆盖清单。",
+                (f"未识别或未核准的条件：{request['unrecognized'][:100]}。请明确指标和口径。"
+                 if request["unrecognized"] else
+                 "该指标或限定条件尚未核准，请查看字段覆盖清单。"),
             )
         if not set(years) <= {"2025", "2024"}:
             return stop("refused", "已核准财务字段覆盖2025年和年报列示的2024年比较数。")
@@ -609,5 +594,7 @@ class DocumentCatalog:
             "mode": "structured_answer",
             "claims": claims,
             "answer_method": "verified_calculation" if calculations else "structured_facts",
-            "message": "依据已核准原文字段直接列示；计算使用披露值，未调用生成接口。",
+            "message": ("按年报“营业收入”口径列示；“营业总收入”为另一指标。"
+                        if any(n["kind"] == "revenue_alias" for n in query.normalizations) else "")
+            + "依据已核准原文字段直接列示；计算使用披露值，未调用生成接口。",
         }

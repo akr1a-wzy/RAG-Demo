@@ -9,102 +9,48 @@ from uuid import uuid4
 
 import httpx
 
-from app.qa.resolution import resolve_document_query
+from app.qa.query_understanding import (
+    CLOSE,
+    DOCUMENT,
+    EXTREME,
+    FORECAST,
+    QueryUnderstanding,
+    capability_decision,
+    market_unrecognized,
+    understand_query,
+)
 from app.tools.tencent import ProviderError, TencentQuoteClient
 from app.tools.ticker import CODE_TO_CANONICAL_NAME, market_prefix
 
 VERSION = "tencent-market-qfq-v1"
-RUNTIME_VERSION = "tencent-market-qfq-v1.3-constraint-routing"
+RUNTIME_VERSION = "tencent-market-qfq-v1.4-query-understanding"
 SHANGHAI = timezone(timedelta(hours=8))
 KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
-FORECAST = re.compile(
-    r"预测|会不会涨|能涨到|翻倍|买入|卖出|目标价|一定会|必涨|推荐买|未来|明天|明年|下周|下个?月|会涨|会跌"
-)
-CLOSE = re.compile(r"收(?:盘|市)(?:价|多少钱|多少|是|报|为|$)")
-MARKET = re.compile(
-    r"现价|股价|行情|价格|报价|最新价|收盘价|收市价|市盈率|市净率|市值|估值"
-    r"|(?<![A-Za-z])(?:PE|PB)(?![A-Za-z])"
-    r"|日K|K线|交易日|\d+日(?:收益|涨跌)", re.I,
-)
-YEAR = re.compile(r"(?<!\d)(20\d{2}|\d{2})\s*年")
-EXTREME = re.compile(r"最高|最低|最大|最小|峰值|高点|低点")
-DOCUMENT = re.compile(
-    r"年报|财务|营收|营业收入|员工|人数|人员|利润|资产|负债|现金|分红|股利|派息|公告|薪酬"
-)
-TIME_SCOPE = re.compile(
-    r"最新|实时|当前|现价|最近|今日|今天|今年|去年|前年|昨日|昨天|前天|上周|上月"
-)
-CORRECTION = re.compile(
-    r"(?:那|那么|我问的是|问的是|我要的是|要的是|改成|换成|不对[，,\s]*)?\s*"
-    r"(?:(?:20\d{2}|\d{2})\s*年(?:的)?|今天|今日|今年|去年|前年)?"
-    r"(?:最高|最低|最大|最小|峰值|高点|低点)?(?:价|价格|股价|收盘价)?"
-    r"(?:的|呢|是多少|多少|多少钱|啊|呀|吗|[？?。！!\s])*"
-)
-
-
-def normalize_market_years(question: str) -> str:
-    # 两位年度仅在行情路由内按本世纪展开，不改变文档报告期解析。
-    return YEAR.sub(lambda m: ("20" + m[1] if len(m[1]) == 2 else m[1]) + "年", question)
-
-
-def effective_market_question(question: str, history: list[dict]) -> str | None:
-    """仅延续相邻行情话题的受限纠正表达，文档或未知话题切断继承。"""
-    context = None
-    for text in [m.get("content", "") for m in history if m.get("role") == "user"] + [question]:
-        text = normalize_market_years(text.strip())
-        explicit = bool(MARKET.search(text) or CLOSE.search(text))
-        correction = bool(CORRECTION.fullmatch(text) and (
-            EXTREME.search(text) or YEAR.search(text) or TIME_SCOPE.search(text)
-        ))
-        if explicit:
-            inherit = context is not None and not TIME_SCOPE.search(text) and (
-                EXTREME.search(text)
-                or (re.match(r"^(?:那|那么|它的|我问的是|问的是)", text)
-                    and (YEAR.search(context) or EXTREME.search(context)))
-            )
-        elif correction and context is not None:
-            inherit = True
-        else:
-            context = None
-            continue
-        if DOCUMENT.search(text) and not explicit:
-            context = None
-            continue
-        if inherit:
-            # 明示的新年度/日期替换上一次条件；最新行情不从文档继承日期。
-            if YEAR.search(text) or TIME_SCOPE.search(text):
-                context = TIME_SCOPE.sub("", YEAR.sub("", context))
-            if EXTREME.search(text):
-                context = EXTREME.sub("", context)
-            context = f"{context} {text}"
-        else:
-            context = text
-    return context
-
-
 class MarketError(ValueError):
     pass
 
 
-def plan_market_request(question: str, history: list[dict]) -> dict | None:
-    effective = effective_market_question(question, history)
-    if effective is None:
+def plan_market_request(question: str, history: list[dict], *,
+                        understanding: QueryUnderstanding | None = None) -> dict | None:
+    query = understanding or understand_query(question, history)
+    if query.domain not in {"market", "mixed"}:
         if not history and EXTREME.fullmatch(question.strip(" ？?。！!")):
             return {"kind": "quote", "days": 20, "status": "clarification",
-                    "resolved": resolve_document_query(question, history),
+                    "resolved": query.resolved,
                     "message": "请明确公司、时间范围，以及最高或最低指股价还是其他指标。"}
         return None
-    resolved = resolve_document_query(normalize_market_years(question), history)
-    question = effective
-    years = list(dict.fromkeys(YEAR.findall(question)))
-    if years:
-        resolved["report_period"] = years[-1]
+    decision = capability_decision(query)
+    resolved = {**query.resolved, "query_understanding": query.metadata()}
+    question = query.effective
+    years = list(query.years)
     resolved["market_intent"] = {
-        "question": question, "years": years,
-        "operation": EXTREME.findall(question)[-1] if EXTREME.search(question) else None,
+        "question": question, "years": years, "operation": query.operation,
     }
     kind = "kline" if re.search(r"日K|K线|交易日|\d+日(?:收益|涨跌)", question, re.I) else "quote"
     request = {"kind": kind, "days": 20, "resolved": resolved, "status": "supported"}
+    if decision is not None:
+        resolved["query_understanding"]["capability"] = decision
+        return {**request, **decision}
     if CLOSE.search(question):
         request.update(kind="closing_price", time_scope=(
             "today" if re.search(r"今日|今天|当日", question) else "latest_closed"))
@@ -119,11 +65,6 @@ def plan_market_request(question: str, history: list[dict]) -> dict | None:
         return {**request, "status": "unsupported", "message": "行情演示仅覆盖登记的20家公司。"}
     if DOCUMENT.search(question):
         return {**request, "status": "clarification", "message": "请将文档问题和行情问题分开提问。"}
-    if EXTREME.search(question):
-        scope = "、".join(years) + "年" if years else "指定区间"
-        return {**request, "status": "unsupported", "message": (
-            f"当前不支持查询{scope}的最高或最低行情值，不能用最新报价代替。"
-            "支持最新股价、PE、PB、市值及最近交易日的前复权日K。")}
     if re.search(r"20\d{2}年|20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}月\d{1,2}日"
                  r"|昨天|昨日|前天|上周|上月|去年|后复权|不复权|分钟|周K|月K|美元|港元",
                  question, re.I):
@@ -143,6 +84,11 @@ def plan_market_request(question: str, history: list[dict]) -> dict | None:
         return {**request, "status": "clarification", "message": "请一次查询一家公司的日K。"}
     if len(resolved["stock_codes"]) > 2:
         return {**request, "status": "unsupported", "message": "行情比较一次最多查询两家公司。"}
+    unknown = market_unrecognized(question)
+    if unknown:
+        resolved["query_understanding"]["unrecognized_conditions"] = unknown
+        return {**request, "status": "unsupported",
+                "message": f"未识别或未支持的行情条件：{unknown[:100]}。请明确查询范围。"}
     return request
 
 

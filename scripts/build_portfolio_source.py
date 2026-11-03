@@ -23,6 +23,7 @@ README = """# 有据 · RAG-Demo：源码阅读包
 
 1. src/app/web/api.py：FastAPI网页、会话与来源PDF白名单。
 2. src/app/web/service.py：员工生成、核准字段和行情工具的分流。
+   src/app/qa/query_understanding.py：共用的表达规范化、上下文和能力前置检查。
 3. src/app/qa/workflow.py、facts.py、catalog.py：检索生成、事实绑定与核准目录。
 4. src/app/retrieval/query_tasks.py、published.py：任务检索与发布凭证校验。
 5. src/app/web/public.py：精确域名/同源、访问码、独立会话及保守请求额度。
@@ -47,6 +48,8 @@ v4的93.33%是30道可回答题上的指定来源页Recall@5，不是答案准�
 2024年值来自2025年报比较列；旧失败和复杂表头风险保留，不承诺任意问题均可准确回答。
 最新行情路由已保留短年度/极值条件与相邻纠正追问；年度最高/最低价的取数和计算尚未实现。
 不支持的年度行情明确提示，不能用最新报价或无关文档证据代替。
+财务与行情共用查询理解层；“总营收”按营业收入口径明示，未知限定仍保留并校验。
+“营业总收入”是独立且未核准的指标，不能与营业收入混用。
 
 ## 材料与隐私
 
@@ -88,10 +91,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path,
                         default=ROOT / "eval/results/portfolio_source_audit.json")
+    parser.add_argument("--validation", type=Path)
     args = parser.parse_args()
     if args.report.exists():
         parser.error("Report already exists; choose a new report path")
-    latest_path = ROOT / "docs/retrospective/evidence/phase28-market-fix-final.json"
+    current_validation = ROOT / "docs/retrospective/evidence/phase31-query-validation.json"
+    previous_validation = ROOT / "docs/retrospective/evidence/phase28-market-fix-final.json"
+    latest_path = (args.validation or (
+        current_validation if current_validation.exists() else previous_validation
+    )).resolve()
     latest = json.loads(latest_path.read_text(encoding="utf-8"))
     entries = {}
     for folder in ["src", "scripts", "tests", "config"]:
@@ -139,6 +147,13 @@ def main():
             "known_local_http": latest["local_http"], "known_public_http": latest["public_http"],
             "model_calls": 0, "original_report": latest_path.relative_to(ROOT).as_posix(),
             "original_report_sha256": digest(latest_path.read_bytes()),
+        },
+        "query_understanding": {
+            "version": latest.get("query_understanding_version"),
+            "role": "shared_normalization_context_and_capability_gate_not_general_NLU_accuracy",
+            "revenue_alias_basis": "营业收入",
+            "operating_revenue_total_is_separate": True,
+            "unknown_qualifiers_preserved": True,
         },
         "corpus": {"companies": 20, "documents": 60, "pages": 5364, "vectors": 32668},
         "audited_selected_facts": {"financial": 320, "announcement_related": 83,
