@@ -52,8 +52,19 @@ python scripts/run_public_demo.py prepare --origin https://YOUR-NGROK-DOMAIN --n
 
 然后重启公网服务使其生效。使用 `--auth` 可恢复认证；普通启动会保留已有配置的模式。
 访问码、ngrok 凭据和配置仅保存在本机，不随仓库提供。
-两种模式均保留每北京时间日 50 次问答尝试、每分钟 20 次 API 写请求及同源检查。
-失败或拒答的问答尝试也计入额度；这些是所有访客共享的上限。
+两种模式均保留同源检查与下列额度。
+
+### 访问限额
+
+- 所有访客共享每天 50 次问答尝试，北京时间每日零点换日，不是每人 50 次或 50 次模型生成。
+- 任意连续 60 秒内最多 20 次 API 写请求，覆盖 `/api/*` 的 POST、PUT、PATCH、DELETE，
+  包括创建或清空会话；每日问答额度仅计 `POST /api/chat`（含尾斜杠）。
+- 入口校验通过、问答进入业务处理前计数，后续拒答或失败不退额度。入口校验拦截和已超限请求不计数。
+- 额度保存在 SQLite 中，重启不会清零。超限返回 HTTP 429，按提示稍后或次日重试。
+- 浏览页面、查看来源和下载 PDF、源码 ZIP 的 GET 请求不计上述额度。
+
+实现见 [`web/public.py`](../src/app/web/public.py)，回归见
+[`test_public_entry.py`](../tests/unit/test_public_entry.py)。
 
 ## 检查与测试
 

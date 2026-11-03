@@ -60,10 +60,7 @@
   "code_tests": {
     "snapshot_date": "2026-11-03",
     "passed": 607,
-    "role": "original_local_environment_suite_not_archive_reproduction",
-    "seconds": 29.28,
-    "original_report": "docs/retrospective/evidence/phase32-pytest.txt",
-    "original_report_sha256": "330822abc302d09ff01f8bf0f770440cb7098ea49c6946971c08ceecdcc190ce"
+    "role": "original_local_environment_suite_not_archive_reproduction"
   },
   "market_constraints": {
     "version": "tencent-market-qfq-v1.4-query-understanding",
@@ -80,8 +77,8 @@
       "seconds": 2.8228430999442935
     },
     "model_calls": 0,
-    "original_report": "docs/retrospective/evidence/phase31-query-validation.json",
-    "original_report_sha256": "1e4ad827ff8ac7b445041b82e9234d10939d36e8ff330af98bea99263787f14f"
+    "original_report": "docs/retrospective/evidence/phase31-query-validation-final.json",
+    "original_report_sha256": "0c8927f588e750c2fd56ac3a1e23bb451a28b9590340cc14152d575fd67436b7"
   },
   "query_understanding": {
     "version": "query-understanding-v1",
@@ -89,6 +86,20 @@
     "revenue_alias_basis": "营业收入",
     "operating_revenue_total_is_separate": true,
     "unknown_qualifiers_preserved": true
+  },
+  "public_entry": {
+    "authentication_required_for_current_demo": false,
+    "shared_across_visitors": true,
+    "chat_attempts_per_day": 50,
+    "day_timezone": "Asia/Shanghai",
+    "day_reset": "00:00",
+    "api_writes_per_rolling_60_seconds": 20,
+    "post_admission_refusal_and_failure_counted": true,
+    "entry_rejected_and_overlimit_requests_counted": false,
+    "usage_persisted_across_restart": true,
+    "static_gets_counted": false,
+    "original_report": "eval/results/phase32-open-access-http.json",
+    "original_report_sha256": "4d10074a1ab277d9a6afe9e012fa5fa75ccec21c79b74a97c4369c2e36c17da4"
   },
   "corpus": {
     "companies": 20,
@@ -101,18 +112,5 @@
     "announcement_related": 83,
     "total": 403,
     "whole_corpus_semantics_verified": false
-  },
-  "public_access": {
-    "role": "anonymous_external_http_known_smoke_not_answer_accuracy",
-    "auth_required": false,
-    "passed": 23,
-    "denominator": 23,
-    "seconds": 3.6655,
-    "model_calls": 0,
-    "shared_daily_chat_attempts": 50,
-    "shared_writes_per_minute": 20,
-    "timing_scope": "external HTTPS serial checks, excludes startup; 2 known structured questions",
-    "original_report": "eval/results/phase32-open-access-http.json",
-    "original_report_sha256": "4d10074a1ab277d9a6afe9e012fa5fa75ccec21c79b74a97c4369c2e36c17da4"
   }
 }

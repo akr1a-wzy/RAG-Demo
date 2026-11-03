@@ -60,7 +60,7 @@ class Note:
         self.y = H - 139
 
     def para(self, text, size=10.5, leading=19, color=INK, gap=10,
-             x=M, width=BODY, font="BodyCN"):
+             x=M, width=BODY - 12, font="BodyCN"):
         style = ParagraphStyle(
             "body", fontName=font, fontSize=size, leading=leading,
             textColor=color, alignment=TA_LEFT, wordWrap="CJK",
@@ -115,9 +115,9 @@ def check_results():
     business = json.loads((ROOT / "eval/results/development/catalog-demo-v3/report.json")
                           .read_text("utf-8"))
     assert (business["passed"], business["denominator"]) == (85, 85)
-    latest = json.loads((ROOT / "docs/retrospective/evidence/phase28-market-fix-final.json")
+    latest = json.loads((ROOT / "docs/retrospective/evidence/phase31-query-validation-final.json")
                        .read_text("utf-8"))
-    assert latest["tests"]["passed"] == 567
+    assert latest["tests"]["passed"] == 607
     # Read saved summaries only; do not rerun sealed evaluations to typeset a document.
 
 
@@ -157,13 +157,17 @@ def main():
     b.heading("在线体验")
     b.link("Demo", origin + "/")
     b.link("代码", GITHUB)
-    b.small("Demo 需要另行提供的访问码。本机和 ngrok 隧道保持运行时才能访问。")
+    b.small("Demo 无需登录。所有访客共享每日 50 次问答尝试，北京时间零点刷新；"
+            "连续 60 秒最多 20 次 API 写请求。本机和 ngrok 隧道须保持运行。")
 
-    b.page(2, "实现流程", "检索、字段查询与行情分别处理")
+    b.page(2, "实现流程", "共享查询理解，分别执行检索、字段查询与行情")
+    b.para("财务与行情先共用查询理解层，规范化别名和短年份，恢复受限的相邻追问，"
+           "保留未知限定，再检查能力范围。总营收按营业收入口径明示；营业总收入是独立未核准指标。",
+           size=10, leading=17, gap=4)
     b.heading("员工问答")
     b.para("先从当前问题和历史消息中识别公司、报告期和主体，再执行 BM25 与 BGE 向量召回，"
            "用 RRF 合并结果。针对员工合计等字段补充检索后，交给 Cross-Encoder 重排，"
-           "从每个检索任务的 20 个候选中保留 Top 5。")
+           "每任务从 20 个候选中取 Top5。")
     b.para("DeepSeek 根据检索结果生成回答，后续检查所引用的事实、年份、单位和来源。"
            "员工回答仍标为草稿；公司或期间不清楚时先询问，缺少受支持事实时展示证据或拒答。")
     b.small("流程：问题与历史 → 公司/期间识别 → 混合检索 → 重排 → 生成 → 引用与事实检查")
@@ -176,7 +180,7 @@ def main():
     b.heading("行情与网页")
     b.para("行情接口提供最新报价和前复权日 K 线，返回来源、业务时间与获取时间。"
            "快照只在用户手动选择回放时使用，并标为非实时。网页由 FastAPI 提供，"
-           "SQLite 保存基本会话历史，公网入口增加认证、同源检查和持久化请求额度。")
+           "SQLite 保存基本会话历史，公网入口支持可选认证、同源检查和持久化请求额度。")
     b.heading("代码位置")
     b.table([
         ("模块", "主要内容"),
@@ -186,29 +190,34 @@ def main():
         ("src/app/web/", "API、会话存储、认证与前端静态文件"),
     ], [146, BODY - 146])
 
-    b.page(3, "开发中遇到的问题", "三个影响实际回答的例子")
-    b.heading("1. 同一张表里，数值对应了错误年度")
-    b.para("年报表格常把两个年度并排列出，单位也可能写在表格上方。早期只核对数字是否出现在"
-           "原文中，无法拦住取错列或套错单位的回答。")
-    b.para("后续把指标行、年度列、数值、局部单位和主体一起绑定。对选定财务字段保存 PDF 哈希、"
-           "坐标和审核图，再从审核目录返回结果。简单的显式年度列已有检查，复杂跨页表头仍有"
-           "未解决的关联问题，因此没有把全部财务表格开放给生成模型。")
-    b.small("相关代码：src/app/qa/facts.py、src/app/qa/catalog.py")
-    b.heading("2. 页码命中后，仍然缺少回答所需的事实")
-    b.para("检索命中来源页，不代表返回的片段已经包含所需字段。同一页可能既有员工合计，"
-           "也有专业构成或不同公司主体。仅按整页命中评分，会漏掉这类问题。")
-    b.para("检索增加了任务和字段补召回；问答阶段继续检查主体、字段和支持事实。"
-           "评测中分别记录来源页召回和全部来源找齐的题数。已经用于修复的失败题保留为回归，"
-           "原一次验收结果不回写，避免把反复调试同一批题后的结果当成新问题表现。")
-    b.small("相关代码：src/app/retrieval/query_tasks.py、src/app/qa/selection.py")
-    b.heading("3. 问年度最高价，却返回最新报价")
-    b.para("实际提问“宁德时代25年股价最高是多少”曾被当成最新股价查询；继续问“问的是最高”，"
-           "又转入了无关的文档检索。原因是行情意图丢失了短年份和最高价条件，纠正追问也没有"
-           "保留原来的查询范围。")
-    b.para("行情分支现在保留短年份、极值条件和相邻纠正追问，并在取数前检查支持范围。"
-           "全年行情取数与极值计算尚未实现，所以这类问题目前明确提示不支持。"
-           "该修复只覆盖行情分支，财务短年份解析的问题仍待处理。")
-    b.small("相关代码：src/app/market/service.py；测试：tests/unit/test_market_constraints.py")
+    b.page(3, "开发中遇到的问题", "从具体失败定位原因，再检查修复引入的回归")
+    b.heading("1. 补回营收来源页，却把关联财务公司表排在首位")
+    b.para("中国神华营收题的正确第 8 页最初未进 20 个候选，扩到 50 个仍未入 Top 5。"
+           "增加财务摘要补召回后，指定页已命中，首位却是第 124 页关联财务公司"
+           "（控股股东的子公司）收入 4,251 百万元，"
+           "上市主体应为 294,916 百万元。当时尚未生成回答。", size=10, leading=17, gap=6)
+    b.para("根因是任意子串“主要财务指标”匹配。改为独立标题边界并排除财务公司子表、季度表后，"
+           "正确第 8 页升至首位。扩大候选只能帮助诊断，报告所属公司也不能代替表内主体识别。"
+           "这道已见题保留为回归，不据此宣称全量主体识别通过。", size=10, leading=17, gap=6)
+    b.small("代码：retrieval/query_tasks.py；证据：神华补召回前后 Top 5 与主体反例。", gap=4)
+    b.heading("2. 数字在原文中，年度和单位仍可能错配")
+    b.para("早期校验只检查数字出现性：合成表中 2025 年为 200、2024 年为 100，"
+           "写成“2025 年为 100”仍能通过。真实解析中也发现前一表“万元”污染局部“元”的情况。",
+           size=10, leading=17, gap=6)
+    b.para("补充指标行、年度列、数值、局部单位与主体绑定，选定财务字段保存 PDF 哈希、坐标和审核图。"
+           "绑定回归 33/33 含 30 个合成用例和 3 个真实来源重建陈述；"
+           "403 项后续证据检查仅覆盖选定字段。"
+           "复杂跨页表头仍有风险，因此财务只开放审核目录。", size=10, leading=17, gap=6)
+    b.small("代码：qa/facts.py、qa/catalog.py；验证范围不等于全语料表格语义。", gap=4)
+    b.heading("3. 同一问法在不同路线中丢失条件")
+    b.para("“宁德时代25年股价最高是多少”曾误返最新价，追问“问的是最高”又进入文档；"
+           "财务的“总营收”“25年”则因别名和年份残留被拒。分支各自解析，局部补词无法保持一致。",
+           size=10, leading=17, gap=6)
+    b.para("改为共享查询理解，保留别名、年度、相邻追问和未知限定，在取数前校验能力。"
+           "已知场景本机 16/16、公网 6/6，0 次生成；总营收按营业收入口径明示。"
+           "确定性规则可追踪、无新增理解模型调用，但表达覆盖有限；年度最高/最低价仍明确不支持。",
+           size=10, leading=17, gap=6)
+    b.small("代码：qa/query_understanding.py、market/service.py；路径均相对 src/app/。", gap=4)
 
     b.page(4, "测试与运行", "结果来自本地开发环境，记录截至2026年11月3日")
     b.table([
@@ -216,15 +225,15 @@ def main():
         ("指定来源页 Recall@5", "93.33%", "v4 的 30 道可回答题，取各题召回率平均值"),
         ("全部来源页找齐", "26/30", "同一批检索题；另外 5 道拒答未在该阶段评分"),
         ("已知业务回归", "85/85", "财务、公告、员工、计算、边界和追问"),
-        ("完整 pytest", "567 项通过", "2026-11-03 原开发环境；部分测试依赖本地数据"),
+        ("完整 pytest", "607 项通过", "2026-11-03 原开发环境历史记录；非公开 CI"),
     ], [146, 86, BODY - 232])
     b.small("Recall 不是答案准确率。85 道业务用例及事实已在开发中见过，由同一助手编制和审核。"
             "另有 403 项选定事实证据检查，没有覆盖全语料表格语义。原报告摘要与 SHA256 在"
             "仓库 review/metrics.json，原始评测数据与报告未随仓库公开。", gap=8)
     b.heading("尚未解决的问题")
     b.para("复杂表头、跨页表格和单位关联仍需继续处理；员工生成回答需要结合引用核对。"
-           "财务查询中的“总营收”和“25年”等表达目前可能被拒绝，已定位到别名和年份解析，"
-           "尚未修复。年度最高价、最低价，以及 LangGraph 节点级断点恢复也尚未实现。")
+           "查询理解仅覆盖有限规则，未知表达可能保守拒答。年度最高价、最低价，"
+           "以及 LangGraph 节点级断点恢复尚未实现。本轮同步材料，没有重跑封存验收。")
     b.heading("本地运行条件")
     b.para("原环境为 Windows、Python 3.11 和 NVIDIA GPU，依赖由 uv.lock 固定。"
            "在输入准备完整的环境中安装依赖并启动：", gap=6)
@@ -237,7 +246,8 @@ def main():
     b.heading("入口与材料")
     b.link("GitHub", GITHUB)
     b.link("项目页", origin + "/static/project.html")
-    b.small("项目页提供 Demo 和源码阅读包；访问码另行提供，PDF 中不包含凭据。")
+    b.small("项目页提供 Demo 和源码阅读包。问答进入业务处理后，拒答或失败仍计额度；"
+            "超限返回 429，稍后或次日再试。重启不清零，浏览与下载不计上述额度。")
 
     b.c.save()
     published = ROOT / "src/app/web/static/downloads/youju-project.pdf"

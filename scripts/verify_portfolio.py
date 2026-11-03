@@ -1,4 +1,4 @@
-"""Authenticated external checks of portfolio assets; no model or business requests."""
+"""External GET checks of portfolio assets; no model or business requests."""
 
 import argparse
 import hashlib
@@ -40,15 +40,18 @@ def digest(value):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--baseline", type=Path,
-                        default=ROOT / "docs/retrospective/evidence/phase26-portfolio-before.json")
+    parser.add_argument("--baseline", type=Path, required=True)
+    parser.add_argument("--pdf-pages-visually-reviewed", type=int, choices=[0, 4], default=0)
     args = parser.parse_args()
     if args.output.exists():
         parser.error("Output already exists")
     config = json.loads((ROOT / "tmp/public-demo/config.json").read_text(encoding="utf-8"))
-    lines = (ROOT / "tmp/public-demo/access.txt").read_text(encoding="utf-8").splitlines()
-    auth = httpx.BasicAuth(lines[0].removeprefix("Username: "),
-                          lines[1].removeprefix("Password: "))
+    auth_required = config.get("auth_required", True)
+    auth = None
+    if auth_required:
+        lines = (ROOT / "tmp/public-demo/access.txt").read_text(encoding="utf-8").splitlines()
+        auth = httpx.BasicAuth(lines[0].removeprefix("Username: "),
+                              lines[1].removeprefix("Password: "))
     before = json.loads(args.baseline.read_text(encoding="utf-8"))
     checks, requests = {}, []
     started = time.perf_counter()
@@ -92,7 +95,8 @@ def main():
             len(p.extract_text()) > 300 for p in reader.pages)
         pdf_text = "\n".join(p.extract_text() for p in reader.pages)
         checks["pdf_metrics_and_boundaries"] = all(s in pdf_text for s in [
-            "93.33%", "85/85", "403", "不含密钥", "567", "不是答案准确率"])
+            "93.33%", "85/85", "403", "不含密钥", "607", "不是答案准确率",
+            "50", "60", "20", "无需登录", "4,251", "294,916"])
         source = get("/static/downloads/youju-source-review.zip")
         checks["published_zip_matches_file"] = digest(source.content) == digest(
             (ROOT / "output/source/youju-source-review.zip").read_bytes())
@@ -110,7 +114,8 @@ def main():
                 "README.md").decode()
         for path in ["/static/project.html", "/static/downloads/youju-project.pdf",
                      "/static/downloads/youju-source-review.zip"]:
-            checks["auth_required:" + path] = get(path, auth=None).status_code == 401
+            checks["access_mode:" + path] = get(path, auth=None).status_code == (
+                401 if auth_required else 200)
     after_runtime = {name: digest((ROOT / name).read_bytes()) for name in before["runtime"]}
     after_qa = {name: digest((ROOT / name).read_bytes()) for name in before["qa"]}
     backend = {name: digest((ROOT / name).read_bytes()) for name in before["backend_hashes"]}
@@ -127,15 +132,15 @@ def main():
     current = {str(row[0]): digest(json.dumps(row, ensure_ascii=False).encode()) for row in rows}
     checks["existing_public_turns_unchanged"] = all(
         current.get(key) == value for key, value in before["existing_public_turn_hashes"].items())
-    report = {"version": "portfolio-entry-v1", "date": "2026-11-03",
+    report = {"version": "portfolio-sync-v2", "date": "2026-11-03",
               "role": "external_static_download_integrity_and_preservation_not_answer_accuracy",
               "origin": config["origin"], "checks": checks, "requests": requests,
               "passed": sum(checks.values()), "denominator": len(checks),
               "all_passed": all(checks.values()),
               "seconds": round(time.perf_counter() - started, 4),
               "model_calls": 0, "top_k": None, "browser_visual_verified": False,
-              "browser_blocker": "Computer Use could not confidently identify current Windows URL",
-              "pdf_pages_visually_reviewed": 4}
+              "browser_blocker": "Not part of this GET-only verifier",
+              "pdf_pages_visually_reviewed": args.pdf_pages_visually_reviewed}
     with args.output.open("x", encoding="utf-8") as file:
         json.dump(report, file, ensure_ascii=False, indent=2)
     print(json.dumps({"report": str(args.output), "passed": report["passed"],

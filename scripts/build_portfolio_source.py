@@ -19,6 +19,14 @@ README = """# 有据 · RAG-Demo：源码阅读包
 它不是完整运行环境：不含原始PDF、模型、索引、审核目录/证据图、封存题目和报告，
 因此解压后不能直接启动完整Demo，也不能把原环境{test_count}项测试通过视为本包全部测试可直接执行。
 
+## 在线体验与访问限额
+
+Demo：https://headwear-caliber-demanding.ngrok-free.dev/ ，当前无需登录。
+由本机与ngrok隧道提供服务，离线时不可用。所有访客共享每天50次问答尝试，
+北京时间每日零点换日；任意连续60秒内最多20次API写请求。
+问答进入业务处理前计数，后续拒答或失败仍消耗额度；入口校验拦截和已超限请求不计数。
+额度持久化，重启不清零；超限返回429，需稍后或次日再试。浏览项目页和下载不计上述额度。
+
 ## 阅读顺序
 
 1. src/app/web/api.py：FastAPI网页、会话与来源PDF白名单。
@@ -95,7 +103,7 @@ def main():
     args = parser.parse_args()
     if args.report.exists():
         parser.error("Report already exists; choose a new report path")
-    current_validation = ROOT / "docs/retrospective/evidence/phase31-query-validation.json"
+    current_validation = ROOT / "docs/retrospective/evidence/phase31-query-validation-final.json"
     previous_validation = ROOT / "docs/retrospective/evidence/phase28-market-fix-final.json"
     latest_path = (args.validation or (
         current_validation if current_validation.exists() else previous_validation
@@ -154,6 +162,19 @@ def main():
             "revenue_alias_basis": "营业收入",
             "operating_revenue_total_is_separate": True,
             "unknown_qualifiers_preserved": True,
+        },
+        "public_entry": {
+            "authentication_required_for_current_demo": False,
+            "shared_across_visitors": True,
+            "chat_attempts_per_day": 50, "day_timezone": "Asia/Shanghai",
+            "day_reset": "00:00", "api_writes_per_rolling_60_seconds": 20,
+            "post_admission_refusal_and_failure_counted": True,
+            "entry_rejected_and_overlimit_requests_counted": False,
+            "usage_persisted_across_restart": True,
+            "static_gets_counted": False,
+            "original_report": "eval/results/phase32-open-access-http.json",
+            "original_report_sha256": digest(
+                (ROOT / "eval/results/phase32-open-access-http.json").read_bytes()),
         },
         "corpus": {"companies": 20, "documents": 60, "pages": 5364, "vectors": 32668},
         "audited_selected_facts": {"financial": 320, "announcement_related": 83,
