@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>有据 · 字段覆盖</title><link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20261027c"><script src="/static/theme.js?v=20261027c"></script><link rel="stylesheet" href="/static/style.css?v=20261027c"></head>
+<body class="coverage-view"><main class="coverage-main"><div class="coverage-top"><a class="coverage-back" href="/">← 返回研究工作台</a><button id="coverage-theme" class="icon-button" aria-label="切换到深色" title="切换主题">◐</button></div><h1>字段覆盖</h1><p>20家公司，来源为2025年报与已有公告。2024年财务数据取自2025年报比较列，保留调整后／重述后口径。公告事件日期按原文，可能发生于2026年。</p>
+<div class="field-list" id="fields">正在读取覆盖清单…</div><p>支持原值、多指标、公司比较、金额单位换算及同比计算。百分比变化显示百分点；同比基数非正时只比较原值。公告预案与本次实施分别列示，保留每股／每10股及含税口径。</p>
+<p class="coverage-note">未列字段表示当前资料未核准，不能推断为零或未发生。季度、母公司单体、税后金额和未来预测不在核准范围。石化员工需注明“本公司”，平安员工需注明“体系”。其他复杂表格仍须核对原文。</p>
+<div class="table-scroll"><table class="coverage-table"><thead><tr><th>公司</th><th>财务覆盖</th><th>已有公告字段</th></tr></thead><tbody id="rows"></tbody></table></div><p id="status"></p></main>
+<script>fetch('/api/coverage').then(r=>{if(!r.ok)throw Error('字段服务未就绪');return r.json()}).then(data=>{const entries=Object.entries(data.coverage);document.getElementById('fields').textContent='核准财务字段：'+entries[0][1].financial_metrics.join('、');for(const [code,c] of entries){const tr=document.createElement('tr');for(const text of [c.stock_name+' '+code,'2025 / 2024 · 8项',c.announcement_fields.join('、')]){const td=document.createElement('td');td.textContent=text;tr.append(td)}document.getElementById('rows').append(tr)}document.getElementById('status').textContent=entries.length+'家公司 · 所有回答均可查看原始PDF物理页。'}).catch(e=>document.getElementById('fields').textContent=e.message)</script>
+<script>
+const themeButton = document.getElementById('coverage-theme');
+function syncCoverageTheme() { const label = window.youjuTheme.current() === 'dark' ? '切换到浅色' : '切换到深色'; themeButton.setAttribute('aria-label', label); themeButton.title = label; }
+themeButton.onclick = () => window.youjuTheme.toggle();
+document.addEventListener('youju:theme', syncCoverageTheme); syncCoverageTheme();
+</script></body></html>

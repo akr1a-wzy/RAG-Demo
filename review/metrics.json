@@ -1,0 +1,95 @@
+{
+  "snapshot_date": "2026-11-03",
+  "generated_answer_accuracy_accepted": false,
+  "retrieval_v4": {
+    "role": "one_shot_source_page_retrieval_not_answer_accuracy",
+    "top_k": 5,
+    "answerable_count": 30,
+    "mean_source_page_recall_at_5": 0.9333333333333333,
+    "all_sources_hit_count": 26,
+    "refusal_not_evaluated": 5,
+    "original_report": "eval/results/blind_v4_once.json",
+    "original_report_sha256": "802016dc7b03951a210238ee7640ef467c8211ce8e23d94d46055a3d797061f0"
+  },
+  "business_v3": {
+    "role": "known_facts_local_business_regression_not_blind_acceptance",
+    "same_assistant_review": true,
+    "passed": 85,
+    "denominator": 85,
+    "groups": {
+      "announcement_route": {
+        "passed": 20,
+        "denominator": 20
+      },
+      "boundary": {
+        "passed": 12,
+        "denominator": 12
+      },
+      "calculation_or_event": {
+        "passed": 8,
+        "denominator": 8
+      },
+      "employee_known_pdf_gold": {
+        "passed": 20,
+        "denominator": 20
+      },
+      "evidence_only": {
+        "passed": 1,
+        "denominator": 1
+      },
+      "financial_route": {
+        "passed": 20,
+        "denominator": 20
+      },
+      "followup": {
+        "passed": 3,
+        "denominator": 3
+      },
+      "market_preserved": {
+        "passed": 1,
+        "denominator": 1
+      }
+    },
+    "seconds": 25.995647500036284,
+    "timing_scope": "local initialized serial HTTP; catalog/LLM/replay, excludes startup",
+    "top_k_employee": 5,
+    "top_k_catalog": null,
+    "original_report": "eval/results/development/catalog-demo-v3/report.json",
+    "original_report_sha256": "29efe7521275cae8465c7c2ab3a1899acdf6e23116390638d36e76742faf3161"
+  },
+  "code_tests": {
+    "snapshot_date": "2026-11-03",
+    "passed": 567,
+    "role": "original_local_environment_suite_not_archive_reproduction"
+  },
+  "market_constraints": {
+    "version": "tencent-market-qfq-v1.3-constraint-routing",
+    "annual_extremes_supported": false,
+    "bounded_correction_and_constraint_protection": true,
+    "known_local_http": {
+      "passed": 10,
+      "denominator": 10,
+      "seconds": 2.1311590000987053
+    },
+    "known_public_http": {
+      "passed": 10,
+      "denominator": 10,
+      "seconds": 3.8874373000580817
+    },
+    "model_calls": 0,
+    "original_report": "docs/retrospective/evidence/phase28-market-fix-final.json",
+    "original_report_sha256": "28ea00581a10760cab9a36886b53e182dbe563671000a0cef34ec447eec85f46"
+  },
+  "corpus": {
+    "companies": 20,
+    "documents": 60,
+    "pages": 5364,
+    "vectors": 32668
+  },
+  "audited_selected_facts": {
+    "financial": 320,
+    "announcement_related": 83,
+    "total": 403,
+    "whole_corpus_semantics_verified": false
+  }
+}
