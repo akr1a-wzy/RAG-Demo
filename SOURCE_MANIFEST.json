@@ -47,8 +47,8 @@
       "bytes": 1776
     },
     "docs/project.pdf": {
-      "sha256": "0f174489d6e6c8246ed0e35f6a2a5c1ce4c5f4592f2d4dcbb369158c643a1f45",
-      "bytes": 78803
+      "sha256": "01779a6e9b3134993ba56653eb7a889d93698a7f3e1a293ac73838125d31a951",
+      "bytes": 173034
     },
     "docs/reproduction.md": {
       "sha256": "baf6f3ce48bbcdf5df9b4f57addf557cf26ef4054b46170aed5b65c37cea39b0",
@@ -99,8 +99,8 @@
       "bytes": 7459
     },
     "scripts/build_portfolio_pdf.py": {
-      "sha256": "59d00770947a513cd4e1ee7e4ef01b8bb6b3b888ef4f42a4e93cfedef51c88db",
-      "bytes": 12802
+      "sha256": "8fe5dffb9896ea1038dffb98fffa9d84ffce46039df911114279023a4777de85",
+      "bytes": 14693
     },
     "scripts/build_portfolio_source.py": {
       "sha256": "814b355282f9748d3c273d7fbf7d3bfcf7d25de5b35f331e9cd7e598492974c8",
