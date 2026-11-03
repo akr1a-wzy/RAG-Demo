@@ -21,7 +21,8 @@ A 股年报问答 Demo（有据），用 Python、LangGraph 和 FastAPI 实现�
 [项目介绍](https://headwear-caliber-demanding.ngrok-free.dev/static/project.html) ·
 [项目说明 PDF](docs/project.pdf)
 
-Demo 需要访问码，由本机通过 ngrok 提供服务，离线时无法访问。
+Demo 当前无需登录，由本机通过 ngrok 提供服务，离线时无法访问。
+所有访客共享每日 50 次问答尝试和每分钟 20 次 API 写请求额度。
 
 ## 功能
 
@@ -68,7 +69,7 @@ python tools/check_source.py
 
 ## 测试与评测
 
-原开发环境最近一次运行 `pytest`：{test_count} 项通过（2026-11-03）。部分测试依赖未公开的数据文件。
+原开发环境完整测试记录：{test_count} 项通过（2026-11-03）。部分测试依赖未公开的数据文件。
 
 检索评测、业务回归及各自的数据范围见 [评测记录](docs/evaluation.md)。
 
@@ -129,8 +130,9 @@ DeepSeek 生成 → 事实、年度、单位与引用检查
 [`web/api.py`](../src/app/web/api.py) 提供聊天和来源接口，前端位于 `web/static/`。SQLite
 保存基本会话历史。
 
-公网通过 [`web/public.py`](../src/app/web/public.py) 增加 HTTP Basic 认证、Host/Origin
-检查和持久化请求额度。公网与本地使用不同的会话库，服务仍监听本机回环地址。
+公网通过 [`web/public.py`](../src/app/web/public.py) 提供可选 HTTP Basic 认证、Host/Origin
+检查和持久化请求额度。当前在线 Demo 关闭登录验证，额度仍保留，所有访客共享。
+公网与本地使用不同的会话库，服务仍监听本机回环地址。
 """
 REPRODUCTION = """# 运行说明
 
@@ -174,6 +176,20 @@ Copy-Item .env.example .env
 ```
 
 默认地址为 `http://127.0.0.1:8000`。缺少数据或发布元数据时会启动失败。
+
+## 公网访问模式
+
+完整运行输入和 ngrok 账号配置就绪后，可运行 `Start-PublicDemo.ps1` 发布公网入口。
+新建配置默认要求账号和访问码；当前在线 Demo 已显式关闭登录。切换示例：
+
+```powershell
+python scripts/run_public_demo.py prepare --origin https://YOUR-NGROK-DOMAIN --no-auth
+```
+
+然后重启公网服务使其生效。使用 `--auth` 可恢复认证；普通启动会保留已有配置的模式。
+访问码、ngrok 凭据和配置仅保存在本机，不随仓库提供。
+两种模式均保留每北京时间日 50 次问答尝试、每分钟 20 次 API 写请求及同源检查。
+失败或拒答的问答尝试也计入额度；这些是所有访客共享的上限。
 
 ## 检查与测试
 

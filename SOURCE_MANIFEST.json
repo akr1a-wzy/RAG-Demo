@@ -43,8 +43,8 @@
       "bytes": 1656
     },
     "README.md": {
-      "sha256": "4e643c9a5a6c3d54b7ad3acc4c397ea345f787f6f06890df1e8a63e9f98b8521",
-      "bytes": 3006
+      "sha256": "32c5b9f046db05b9fc316498e36fd7d7071c302bf64ded29a013527efef92888",
+      "bytes": 2997
     },
     "review/metrics.json": {
       "sha256": "8efaa1585ca7f64768d11a83e07732891dcef95e239b30590b791855364fe5e5",
@@ -199,8 +199,8 @@
       "bytes": 1526
     },
     "scripts/prepare_github_portfolio.py": {
-      "sha256": "e912fd836dacae005e993dbda5fb0257a365110ae593412e2b95c729fb76cf02",
-      "bytes": 13158
+      "sha256": "2e3c3d3013d7914db1407ce34aaf11cdf573008b8c97b8283b1bec1cc20a62da",
+      "bytes": 14073
     },
     "scripts/publish_document_catalog.py": {
       "sha256": "578e034385eff8adb84ceb9a3c709c0fa331313b42b69124e7755b58ef96c168",
