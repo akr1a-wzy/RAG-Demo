@@ -1,56 +1,65 @@
-# 有据 · RAG-Demo
+# RAG-Demo
 
-面向复杂年报的可追溯问答项目，重点处理PDF结构、混合检索、事实约束、引用和失败回归。
+A 股年报问答 Demo（有据），用 Python、LangGraph 和 FastAPI 实现。回答附带原文摘录和 PDF 页码，
+可在页面中打开来源。
 
-[在线项目介绍](https://headwear-caliber-demanding.ngrok-free.dev/static/project.html) ·
-[体验Demo](https://headwear-caliber-demanding.ngrok-free.dev/) ·
-[4页项目说明](docs/project.pdf) · [架构](docs/architecture.md) · [运行边界](docs/reproduction.md)
+[Demo](https://headwear-caliber-demanding.ngrok-free.dev/) ·
+[项目介绍](https://headwear-caliber-demanding.ngrok-free.dev/static/project.html) ·
+[项目说明 PDF](docs/project.pdf)
 
-在线Demo需要演示账号与另行提供的访问码，本仓库不包含凭据。服务运行于本机GPU，经ngrok转发，
-设备或网络离线时Demo不可用；本仓库是源码阅读快照，不是完整运行环境。
+Demo 需要访问码，由本机通过 ngrok 提供服务，离线时无法访问。
 
-## 实现范围
+## 功能
 
-- 20家公司、60份公开年报与公告、5,364页PDF，32,668个向量子片段。
-- 员工问答：BM25＋BGE向量＋RRF、任务/字段检索、GPU重排、DeepSeek生成与事实/引用校验，输出仍为草稿。
-- 财务/公告：读取核准目录，使用Decimal执行受支持的换算、同比和差额，保留原年度、单位与PDF物理页。
-- 行情：最新股价、PE/PB/市值、最近交易日前复权日K和显式快照回放。
-- FastAPI聊天页、会话恢复、PDF来源、独立公网认证与持久化请求额度。
+- **年报问答**：目前主要支持员工人数查询。BM25 和 BGE 向量混合检索，经重排后交给 DeepSeek
+  生成回答，再检查事实、年度、单位和引用。
+- **财务与公告查询**：从审核过的字段目录读取数值，用 `Decimal` 计算同比、差额和单位换算。
+- **行情查询**：最新报价、PE、PB、市值、前复权日 K 线；支持手动回放保存的行情快照。
+- **Web 界面**：连续对话、历史会话、PDF 跳转、浅色与深色主题。
 
-## 最新修复与仍未实现
+当前数据覆盖 20 家公司、60 份年报及公告。财务和公告查询使用结构化目录，员工问答走 RAG，两条路径在
+[架构说明](docs/architecture.md) 中分别介绍。
 
-`tencent-market-qfq-v1.3-constraint-routing`保留“25年/2025年、最高/最低”及相邻纠正追问，
-不再用最新报价替代年度极值，也不把“问的是最高”送去查无关年报。
-指定年度完整行情取数、全年覆盖验证、极值计算尚未实现；不支持时明确提示。
-其他复杂表头、任意财务语义和自然问法泛化仍有边界，旧错误响应与失败报告不改写。
+## 代码结构
 
-## 证据与指标
+```text
+src/app/
+├── retrieval/   # PDF 解析、切分、混合检索与重排
+├── qa/          # 问答流程、字段目录、计算与引用检查
+├── market/      # 行情接口、K 线与快照回放
+└── web/         # FastAPI、会话存储和前端
+scripts/         # 数据处理、校验和启动脚本
+tests/           # 单元与集成测试
+docs/            # 架构、运行说明和评测记录
+```
 
-| 检查 | 结果 | 口径 |
-|---|---:|---|
-| v4指定来源页Recall@5 | 93.33% | 30道可回答题，完整来源找齐26/30；不是答案准确率 |
-| 已知业务回归 | 85/85 | 同一助手审核，已见题；不同契约不能直接比较提升 |
-| 选定事实证据检查 | 403项 | 320条财务比较事实＋83条公告相关事实，非全表语义验收 |
-| 最新行情约束HTTP | 本机/公网各10/10 | 已知场景、0生成；未实现年度极值功能 |
-| 原本机完整测试 | 567项通过 | 2026-11-03，2条已有依赖警告；不是本仓库解压复现结果 |
+请求从 [`web/service.py`](src/app/web/service.py) 分流。员工问答流程见
+[`qa/workflow.py`](src/app/qa/workflow.py)，财务目录查询见
+[`qa/catalog.py`](src/app/qa/catalog.py)，行情入口见
+[`market/service.py`](src/app/market/service.py)。
 
-选定指标角色、分母及原报告SHA见[review/metrics.json](review/metrics.json)。原始数据、审核证据及封存题目不随本阅读包公开，
-本仓库不把本机实验写成线上SLA、生产流量或通用准确率。
+## 运行
 
-## 从哪里读代码
+Python 3.11，原开发环境为 Windows + NVIDIA GPU。依赖由 `uv.lock` 固定。
 
-1. [Web入口](src/app/web/api.py)与[业务分流](src/app/web/service.py)。
-2. [问答图](src/app/qa/workflow.py)、[事实绑定](src/app/qa/facts.py)、
-   [核准字段](src/app/qa/catalog.py)。
-3. [任务检索](src/app/retrieval/query_tasks.py)与[发布凭证](src/app/retrieval/published.py)。
-4. [行情及约束](src/app/market/service.py)与[相邻追问测试](tests/unit/test_market_constraints.py)。
-5. [公网入口](src/app/web/public.py)及其认证、同源和额度测试。
+**仓库未附带原始 PDF、模型、索引和审核目录，克隆后还不能直接启动完整 Demo。** 所需输入和配置见
+[运行说明](docs/reproduction.md)。
 
-## 本仓库可以直接做什么
+不安装依赖也可以检查源码文件与 Python 语法：
 
-使用Python3.11执行`python tools/check_source.py`，校验文件清单、哈希和Python语法，
-不需要模型或API Key。
-完整Demo还依赖未随包提供的PDF、模型、冻结索引、发布凭证、核准目录及图像证据。
-依赖与准备边界详见[docs/reproduction.md](docs/reproduction.md)，不能承诺克隆后直接启动或执行全部567项测试。
+```bash
+python tools/check_source.py
+```
 
-材料快照：2026-11-03。项目名称暂保留“有据”；GitHub仓库名由用户指定为RAG-Demo。
+## 测试与评测
+
+原开发环境最近一次运行 `pytest`：567 项通过（2026-11-03）。部分测试依赖未公开的数据文件。
+
+检索评测、业务回归及各自的数据范围见 [评测记录](docs/evaluation.md)。
+
+## 已知问题
+
+- 复杂表头、跨页表格和单位关联仍有未解决的问题；财务查询只开放已审核字段。
+- 员工回答仍标记为草稿，需结合引用核对。
+- 暂不支持指定年度的最高价、最低价查询。
+- 会话只保存基本历史，尚未实现 LangGraph 节点级断点恢复。
