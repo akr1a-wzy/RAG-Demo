@@ -7,7 +7,8 @@ A 股年报问答 Demo（有据），用 Python、LangGraph 和 FastAPI 实现�
 [项目介绍](https://headwear-caliber-demanding.ngrok-free.dev/static/project.html) ·
 [项目说明 PDF](docs/project.pdf)
 
-Demo 需要访问码，由本机通过 ngrok 提供服务，离线时无法访问。
+Demo 当前无需登录，由本机通过 ngrok 提供服务，离线时无法访问。
+所有访客共享每日 50 次问答尝试和每分钟 20 次 API 写请求额度。
 
 ## 功能
 
@@ -54,7 +55,7 @@ python tools/check_source.py
 
 ## 测试与评测
 
-原开发环境完整测试记录：600 项通过（2026-11-03）。部分测试依赖未公开的数据文件。
+原开发环境完整测试记录：607 项通过（2026-11-03）。部分测试依赖未公开的数据文件。
 
 检索评测、业务回归及各自的数据范围见 [评测记录](docs/evaluation.md)。
 

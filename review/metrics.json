@@ -59,8 +59,11 @@
   },
   "code_tests": {
     "snapshot_date": "2026-11-03",
-    "passed": 600,
-    "role": "original_local_environment_suite_not_archive_reproduction"
+    "passed": 607,
+    "role": "original_local_environment_suite_not_archive_reproduction",
+    "seconds": 29.28,
+    "original_report": "docs/retrospective/evidence/phase32-pytest.txt",
+    "original_report_sha256": "330822abc302d09ff01f8bf0f770440cb7098ea49c6946971c08ceecdcc190ce"
   },
   "market_constraints": {
     "version": "tencent-market-qfq-v1.4-query-understanding",
@@ -98,5 +101,18 @@
     "announcement_related": 83,
     "total": 403,
     "whole_corpus_semantics_verified": false
+  },
+  "public_access": {
+    "role": "anonymous_external_http_known_smoke_not_answer_accuracy",
+    "auth_required": false,
+    "passed": 23,
+    "denominator": 23,
+    "seconds": 3.6655,
+    "model_calls": 0,
+    "shared_daily_chat_attempts": 50,
+    "shared_writes_per_minute": 20,
+    "timing_scope": "external HTTPS serial checks, excludes startup; 2 known structured questions",
+    "original_report": "eval/results/phase32-open-access-http.json",
+    "original_report_sha256": "4d10074a1ab277d9a6afe9e012fa5fa75ccec21c79b74a97c4369c2e36c17da4"
   }
 }

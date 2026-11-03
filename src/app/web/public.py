@@ -1,4 +1,4 @@
-"""Opt-in authenticated public entry; keeps the original local API unchanged."""
+"""Public entry with optional login; keeps the original local API unchanged."""
 
 import base64
 import hashlib
@@ -27,8 +27,11 @@ class PublicConfig:
     daily_chat_limit: int = 50
     writes_per_minute: int = 20
     max_body_bytes: int = 16384
+    auth_required: bool = True
 
     def __post_init__(self):
+        if not isinstance(self.auth_required, bool):
+            raise ValueError("auth_required must be a boolean")
         parsed = urlsplit(self.origin)
         if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
                 or parsed.path or parsed.query or parsed.fragment or "*" in parsed.netloc
@@ -126,7 +129,7 @@ class PublicEntry:
             return await reject(400, "Invalid host")
         if headers.get(b"host", b"").lower() != self.authority:
             return await reject(400, "Invalid host")
-        if not self.authorized(headers.get(b"authorization", b"")):
+        if self.config.auth_required and not self.authorized(headers.get(b"authorization", b"")):
             with self.failure_lock:
                 now = time.monotonic()
                 while self.failures and self.failures[0] <= now - 60:

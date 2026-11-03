@@ -48,5 +48,6 @@ DeepSeek 生成 → 事实、年度、单位与引用检查
 [`web/api.py`](../src/app/web/api.py) 提供聊天和来源接口，前端位于 `web/static/`。SQLite
 保存基本会话历史。
 
-公网通过 [`web/public.py`](../src/app/web/public.py) 增加 HTTP Basic 认证、Host/Origin
-检查和持久化请求额度。公网与本地使用不同的会话库，服务仍监听本机回环地址。
+公网通过 [`web/public.py`](../src/app/web/public.py) 提供可选 HTTP Basic 认证、Host/Origin
+检查和持久化请求额度。当前在线 Demo 关闭登录验证，额度仍保留，所有访客共享。
+公网与本地使用不同的会话库，服务仍监听本机回环地址。

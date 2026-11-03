@@ -1,4 +1,4 @@
-"""Prepare private public-entry configuration, or serve the authenticated entry."""
+"""Prepare private public-entry configuration, or serve the public entry."""
 
 import argparse
 import hashlib
@@ -15,6 +15,8 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     prepare = commands.add_parser("prepare")
     prepare.add_argument("--origin", required=True)
+    prepare.add_argument("--auth", action=argparse.BooleanOptionalAction, default=None,
+                         help="Require login by default; --no-auth disables it")
     serve = commands.add_parser("serve")
     serve.add_argument("--port", type=int, default=8010)
     args = parser.parse_args()
@@ -35,6 +37,8 @@ def main():
                 password.encode()).hexdigest(),
             "state_dir": "data/public_demo", "daily_chat_limit": 50,
             "writes_per_minute": 20, "max_body_bytes": 16384,
+            "auth_required": (args.auth if args.auth is not None
+                              else existing.get("auth_required", True)),
         }
         PublicConfig(**{**data, "state_dir": ROOT / data["state_dir"]})
         if password:
@@ -43,6 +47,7 @@ def main():
         config_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
                                encoding="utf-8")
         print(json.dumps({"origin": data["origin"], "config": str(config_path),
+                          "auth_required": data["auth_required"],
                           "access_file": str(private / "access.txt")}, ensure_ascii=False))
         return
     if not 1 <= args.port <= 65535:

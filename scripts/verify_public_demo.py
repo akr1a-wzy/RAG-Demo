@@ -1,4 +1,4 @@
-"""External authenticated smoke checks. Uses structured facts; no LLM calls."""
+"""External public-entry smoke checks. Uses structured facts; no LLM calls."""
 
 import argparse
 import hashlib
@@ -40,14 +40,18 @@ def main():
         parser.error("Output already exists; choose a new report path")
     private = ROOT / "tmp/public-demo"
     config = json.loads((private / "config.json").read_text(encoding="utf-8"))
-    access = (private / "access.txt").read_text(encoding="utf-8").splitlines()
-    auth = httpx.BasicAuth(access[0].removeprefix("Username: "),
-                          access[1].removeprefix("Password: "))
+    auth_required = config.get("auth_required", True)
+    auth = None
+    if auth_required:
+        access = (private / "access.txt").read_text(encoding="utf-8").splitlines()
+        auth = httpx.BasicAuth(access[0].removeprefix("Username: "),
+                              access[1].removeprefix("Password: "))
     checks, requests = {}, []
     before, personal_sid = snapshot()
     started = time.perf_counter()
     report = {"date": datetime.now(UTC).isoformat(), "version": "ngrok-public-entry-v1",
               "origin": config["origin"],
+              "auth_required": auth_required,
               "role": "external_HTTP_known_structured_smoke_not_accuracy",
               "model_calls": 0, "before": before, "checks": checks, "requests": requests,
               "browser_verified": False, "phone_network_verified": False}
@@ -64,9 +68,13 @@ def main():
                 return response
 
             r = request("GET", "/", auth=None)
-            checks["unauthenticated_home_401"] = r.status_code == 401
+            checks["anonymous_home_matches_auth_mode"] = (
+                r.status_code == (401 if auth_required else 200))
+            checks["login_challenge_matches_auth_mode"] = (
+                ("www-authenticate" in r.headers) == auth_required)
             r = request("GET", "/api/health", auth=httpx.BasicAuth("demo", "invalid"))
-            checks["wrong_password_401"] = r.status_code == 401
+            checks["invalid_credentials_match_auth_mode"] = (
+                r.status_code == (401 if auth_required else 200))
             r = request("GET", "/")
             checks["authenticated_home_200"] = r.status_code == 200 and "有据" in r.text
             checks["authenticated_private_no_store"] = "no-store" in r.headers.get(

@@ -26,7 +26,7 @@ README = """# 有据 · RAG-Demo：源码阅读包
    src/app/qa/query_understanding.py：共用的表达规范化、上下文和能力前置检查。
 3. src/app/qa/workflow.py、facts.py、catalog.py：检索生成、事实绑定与核准目录。
 4. src/app/retrieval/query_tasks.py、published.py：任务检索与发布凭证校验。
-5. src/app/web/public.py：精确域名/同源、访问码、独立会话及保守请求额度。
+5. src/app/web/public.py：精确域名/同源、可选访问码、独立会话及保守请求额度。
 6. tests/：测试源码；部分测试依赖未随包提供的原始数据与冻结报告。
 7. review/metrics.json：选定报告的口径、样本量、分母与原报告SHA256。
 

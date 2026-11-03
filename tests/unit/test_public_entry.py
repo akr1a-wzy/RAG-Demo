@@ -137,6 +137,47 @@ def test_login_failure_throttle_does_not_lock_out_correct_password(config):
         assert client.get("/", headers={"Authorization": credential()}).status_code == 200
 
 
+def test_open_entry_allows_anonymous_resources_and_ignores_cached_credentials(config):
+    with TestClient(entry(replace(config, auth_required=False)), base_url=ORIGIN) as client:
+        for path in ["/", "/api/health", "/static/project.html", "/documents/report.pdf"]:
+            result = client.get(path)
+            assert result.status_code == 200
+            assert "www-authenticate" not in result.headers
+        for _ in range(12):
+            assert client.get("/", headers={"Authorization": "Basic invalid"}).status_code == 200
+
+
+def test_open_entry_retains_host_origin_body_and_hidden_docs_guards(config):
+    config = replace(config, auth_required=False, max_body_bytes=8)
+    with TestClient(entry(config), base_url=ORIGIN) as client:
+        assert client.get("/", headers={"Host": "evil.invalid"}).status_code == 400
+        assert client.post("/api/chat", headers={"Origin": "https://evil.invalid"}
+                           ).status_code == 403
+        assert client.post("/api/chat", content="x" * 9).status_code == 413
+        assert client.get("/openapi.json").status_code == 404
+        result = client.post("/api/chat", content="{}", headers={"Origin": ORIGIN})
+        assert result.status_code == 200
+        assert result.json()["origin"] == "http://127.0.0.1"
+
+
+def test_open_entry_retains_persistent_daily_and_global_rate_limits(config):
+    config = replace(config, auth_required=False, daily_chat_limit=1, writes_per_minute=2)
+    with TestClient(entry(config), base_url=ORIGIN) as client:
+        assert client.post("/api/chat").status_code == 200
+    with TestClient(entry(config), base_url=ORIGIN) as client:
+        assert client.post("/api/chat").status_code == 429
+        assert client.post("/api/sessions").status_code == 200
+        assert client.post("/api/sessions", headers={"X-Forwarded-For": "1.2.3.4"}
+                           ).status_code == 429
+        assert client.get("/").status_code == 200
+
+
+@pytest.mark.parametrize("value", ["false", 0, None])
+def test_auth_mode_requires_an_explicit_boolean(config, value):
+    with pytest.raises(ValueError, match="boolean"):
+        replace(config, auth_required=value)
+
+
 def test_daily_budget_resets_on_beijing_date_boundary(config):
     budget = PublicBudget(replace(config, daily_chat_limit=1, writes_per_minute=100))
     # UTC 15:59:59, then 16:00:00 crosses midnight in Asia/Shanghai.
@@ -166,7 +207,8 @@ def test_public_state_cannot_be_pointed_at_personal_database(tmp_path):
     assert not (tmp_path / "data/personal").exists()
 
 
-def test_public_factory_uses_isolated_sessions_and_unchanged_local_checks(tmp_path):
+@pytest.mark.parametrize("auth_required", [True, False])
+def test_public_factory_uses_isolated_sessions_and_unchanged_local_checks(tmp_path, auth_required):
     import json
 
     from app.web.public import create_public_app
@@ -175,7 +217,7 @@ def test_public_factory_uses_isolated_sessions_and_unchanged_local_checks(tmp_pa
     manifests.mkdir(parents=True)
     (manifests / "documents.jsonl").write_text("", encoding="utf-8")
     config = PublicConfig(ORIGIN, "demo", hashlib.sha256(PASSWORD.encode()).hexdigest(),
-                          tmp_path / "data/public_demo")
+                          tmp_path / "data/public_demo", auth_required=auth_required)
 
     class FakeEngine:
         def metadata(self):
@@ -185,7 +227,8 @@ def test_public_factory_uses_isolated_sessions_and_unchanged_local_checks(tmp_pa
             return {"mode": "evidence_only", "message": "synthetic source"}
 
     app = create_public_app(tmp_path, config, engine_factory=FakeEngine)
-    with TestClient(app, base_url=ORIGIN, headers={"Authorization": credential()}) as client:
+    with TestClient(app, base_url=ORIGIN,
+                    headers={"Authorization": credential()} if auth_required else {}) as client:
         sid = client.post("/api/sessions", headers={"Origin": ORIGIN}).json()["session_id"]
         result = client.post("/api/chat", json={"session_id": sid, "question": "synthetic"},
                              headers={"Origin": ORIGIN})

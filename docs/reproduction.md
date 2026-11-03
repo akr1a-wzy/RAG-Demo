@@ -41,6 +41,20 @@ Copy-Item .env.example .env
 
 默认地址为 `http://127.0.0.1:8000`。缺少数据或发布元数据时会启动失败。
 
+## 公网访问模式
+
+完整运行输入和 ngrok 账号配置就绪后，可运行 `Start-PublicDemo.ps1` 发布公网入口。
+新建配置默认要求账号和访问码；当前在线 Demo 已显式关闭登录。切换示例：
+
+```powershell
+python scripts/run_public_demo.py prepare --origin https://YOUR-NGROK-DOMAIN --no-auth
+```
+
+然后重启公网服务使其生效。使用 `--auth` 可恢复认证；普通启动会保留已有配置的模式。
+访问码、ngrok 凭据和配置仅保存在本机，不随仓库提供。
+两种模式均保留每北京时间日 50 次问答尝试、每分钟 20 次 API 写请求及同源检查。
+失败或拒答的问答尝试也计入额度；这些是所有访客共享的上限。
+
 ## 检查与测试
 
 只检查仓库文件哈希和 Python 语法，不需要模型、API Key 或第三方依赖：

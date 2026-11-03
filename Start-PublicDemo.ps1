@@ -60,16 +60,23 @@ try {
           -RedirectStandardError "$publicDemoRun\demo.stderr.log"
         $publicDemoNewProcesses += $publicDemoServer
     }
-    $publicDemoAccessLines = Get-Content -LiteralPath (Join-Path $publicDemoPrivate 'access.txt')
-    $publicDemoUser = $publicDemoAccessLines[0].Substring('Username: '.Length)
-    $publicDemoPass = $publicDemoAccessLines[1].Substring('Password: '.Length)
-    $publicDemoBasic = [Convert]::ToBase64String(
-        [Text.Encoding]::UTF8.GetBytes($publicDemoUser + ':' + $publicDemoPass))
+    $publicDemoConfig = Get-Content -LiteralPath (Join-Path $publicDemoPrivate 'config.json') -Raw |
+        ConvertFrom-Json
+    $publicDemoAuthRequired = $publicDemoConfig.auth_required -ne $false
+    $publicDemoHealthHeaders = @{Host=([Uri]$publicDemoOrigin).Authority}
+    if ($publicDemoAuthRequired) {
+        $publicDemoAccessLines = Get-Content -LiteralPath (Join-Path $publicDemoPrivate 'access.txt')
+        $publicDemoUser = $publicDemoAccessLines[0].Substring('Username: '.Length)
+        $publicDemoPass = $publicDemoAccessLines[1].Substring('Password: '.Length)
+        $publicDemoBasic = [Convert]::ToBase64String(
+            [Text.Encoding]::UTF8.GetBytes($publicDemoUser + ':' + $publicDemoPass))
+        $publicDemoHealthHeaders.Authorization = "Basic $publicDemoBasic"
+    }
     $publicDemoReady = $false
     for ($publicDemoAttempt = 0; $publicDemoAttempt -lt 45; $publicDemoAttempt++) {
         try {
             $publicDemoHealth = Invoke-RestMethod "http://127.0.0.1:$DemoPort/api/health" `
-                -Headers @{Host=([Uri]$publicDemoOrigin).Authority;Authorization="Basic $publicDemoBasic"} `
+                -Headers $publicDemoHealthHeaders `
                 -TimeoutSec 3
             if ($publicDemoHealth.status -eq 'ready') { $publicDemoReady = $true; break }
         } catch { }
@@ -79,6 +86,7 @@ try {
     if (-not $publicDemoReady) { throw "Public demo is not ready. Logs: $publicDemoRun" }
     $publicDemoState = [ordered]@{
         origin=$publicDemoOrigin;port=$DemoPort;ready=$true;logs=$publicDemoRun
+        auth_required=$publicDemoAuthRequired
         access_file=(Join-Path $publicDemoPrivate 'access.txt')
         server_pid=if ($publicDemoServer) {$publicDemoServer.Id} else {$publicDemoListener.OwningProcess}
         agent_pid=if ($publicDemoConnector) {$publicDemoConnector.Id} else {$publicDemoAgent.OwningProcess}
